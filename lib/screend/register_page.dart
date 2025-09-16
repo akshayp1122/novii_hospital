@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:noviindus_patients/presentation/providers/auth_provider.dart';
 import 'package:noviindus_patients/presentation/providers/branch_provider.dart';
+import 'package:noviindus_patients/presentation/providers/treatment_provider.dart';
 import 'package:noviindus_patients/screend/regi.dart';
 import 'package:provider/provider.dart';
 
@@ -33,9 +34,11 @@ void initState() {
   WidgetsBinding.instance.addPostFrameCallback((_) {
     final authProvider = Provider.of<AuthProvider>(context, listen: false);
     final branchProvider = Provider.of<BranchProvider>(context, listen: false);
+     final treatmentProvider = Provider.of<TreatmentProvider>(context, listen: false);
 
     if (authProvider.token != null) {
       branchProvider.fetchBranches(authProvider.token!);
+      treatmentProvider.fetchTreatments(authProvider.token!);
     }
   });
 }
@@ -131,9 +134,10 @@ void initState() {
                   .entries
                   .map((entry) => Card(
                         child: ListTile(
-                          title: Text(entry.value["name"]),
+                          title: Text(entry.value["name"],style: TextStyle(fontSize: 18 , fontWeight: FontWeight.w700),
+                       ),
                           subtitle: Text(
-                              "Male ${entry.value["male"]}, Female ${entry.value["female"]}"),
+                              "Male ${entry.value["male"]},     Female ${entry.value["female"]}" ,style: TextStyle(fontSize: 16 ,color: Colors.green)),
                           trailing: Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
@@ -403,48 +407,62 @@ void initState() {
       ],
     );
   }
+void _addTreatment({int? editIndex}) {
+   final treatmentProvider =
+      Provider.of<TreatmentProvider>(context, listen: false);
+  String? selectedTreatment;
+  int male = 0, female = 0;
 
-  void _addTreatment({int? editIndex}) {
-    String? selectedTreatment;
-    int male = 0, female = 0;
+  if (editIndex != null) {
+    selectedTreatment = treatments[editIndex]["name"];
+    male = treatments[editIndex]["male"];
+    female = treatments[editIndex]["female"];
+  }
 
-    if (editIndex != null) {
-      selectedTreatment = treatments[editIndex]["name"];
-      male = treatments[editIndex]["male"];
-      female = treatments[editIndex]["female"];
-    }
-
-    showDialog(
-      context: context,
-      builder: (context) {
-        return AlertDialog(
-          content: StatefulBuilder(
-            builder: (context, setStateDialog) {
-              return Column(
+  showDialog(
+    context: context,
+    builder: (context) {
+      return AlertDialog(backgroundColor: Colors.white,
+        content: StatefulBuilder(
+          builder: (context, setStateDialog) {
+            return SingleChildScrollView( // 👈 prevents vertical overflow
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  DropdownButtonFormField<String>(
-                    value: selectedTreatment,
-                    decoration:
-                        const InputDecoration(labelText: "Choose Treatment"),
-                    items: [
-                      "Couple Combo package",
-                      "Single Therapy",
-                      "Special Offer"
-                    ]
-                        .map((e) => DropdownMenuItem(value: e, child: Text(e)))
-                        .toList(),
-                    onChanged: (val) =>
-                        setStateDialog(() => selectedTreatment = val),
-                  ),
+                  Text("Choose treatment",style: TextStyle(fontSize: 16),),
+                  SizedBox(height: 8,),
+                  treatmentProvider.loading
+                      ? const Center(child: CircularProgressIndicator())
+                      : DropdownButtonFormField<String>(
+                          isExpanded: true, // 👈 fixes horizontal overflow
+                          value: selectedTreatment,
+                          decoration: const InputDecoration(
+                            labelText: "Choose prefered Treatment",
+                            labelStyle: TextStyle(overflow: TextOverflow.ellipsis),
+                          ),
+                          items: treatmentProvider.treatments.map((t) {
+                            return DropdownMenuItem(
+                              value: t.name,
+                              child: Text(
+                                "${t.name} (${t.duration}) - ₹${t.price}",
+                                overflow: TextOverflow.ellipsis,
+                                maxLines: 1,
+                              ),
+                            );
+                          }).toList(),
+                          onChanged: (val) =>
+                              setStateDialog(() => selectedTreatment = val),
+                        ),
                   const SizedBox(height: 16),
+
+                  // Male Counter
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       const Text("Male"),
                       IconButton(
-                        icon:
-                            const Icon(Icons.remove_circle, color: Colors.red),
+                        icon: const Icon(Icons.remove_circle, color: Colors.green),
                         onPressed: () {
                           if (male > 0) setStateDialog(() => male--);
                         },
@@ -456,13 +474,14 @@ void initState() {
                       ),
                     ],
                   ),
+
+                  // Female Counter
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       const Text("Female"),
                       IconButton(
-                        icon:
-                            const Icon(Icons.remove_circle, color: Colors.red),
+                        icon: const Icon(Icons.remove_circle, color: Colors.green),
                         onPressed: () {
                           if (female > 0) setStateDialog(() => female--);
                         },
@@ -474,7 +493,10 @@ void initState() {
                       ),
                     ],
                   ),
+
                   const SizedBox(height: 20),
+
+                  // Save Button
                   ElevatedButton(
                     onPressed: () {
                       if (selectedTreatment != null) {
@@ -493,17 +515,21 @@ void initState() {
                         Navigator.pop(context);
                       }
                     },
-                    style:
-                        ElevatedButton.styleFrom(backgroundColor: Colors.green),
-                    child: const Text("Save",
-                        style: TextStyle(color: Colors.white)),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.green,
+                    ),
+                    child: const Text(
+                      "Save",
+                      style: TextStyle(color: Colors.white),
+                    ),
                   ),
                 ],
-              );
-            },
-          ),
-        );
-      },
-    );
-  }
-}
+              ),
+            );
+          },
+        ),
+      );
+    },
+  );
+}}
+
