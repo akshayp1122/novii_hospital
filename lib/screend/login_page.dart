@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:noviindus_patients/presentation/providers/auth_provider.dart';
+// import 'package:noviindus_patients/screend/home_ui.dart';
 import 'package:provider/provider.dart';
 import 'home_page.dart';
 
@@ -122,7 +123,7 @@ class _LoginPageState extends State<LoginPage> {
                                 if (!mounted) return;
                                 Navigator.pushReplacement(
                                   context,
-                                  MaterialPageRoute(builder: (_) => const HomePage()),
+                                  MaterialPageRoute(builder: (_) => const BookingListPage()),
                                 );
                               } else if (authProvider.error != null) {
                                 // Show nicer error message
