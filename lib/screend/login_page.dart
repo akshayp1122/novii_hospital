@@ -1,10 +1,23 @@
 import 'package:flutter/material.dart';
+import 'package:noviindus_patients/presentation/providers/auth_provider.dart';
+import 'package:provider/provider.dart';
+import 'home_page.dart';
 
-class LoginPage extends StatelessWidget {
+class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
 
   @override
+  State<LoginPage> createState() => _LoginPageState();
+}
+
+class _LoginPageState extends State<LoginPage> {
+  final TextEditingController _usernameController = TextEditingController();
+  final TextEditingController _passwordController = TextEditingController();
+
+  @override
   Widget build(BuildContext context) {
+    final authProvider = Provider.of<AuthProvider>(context);
+
     return Scaffold(
       body: SingleChildScrollView(
         child: Column(
@@ -16,8 +29,7 @@ class LoginPage extends StatelessWidget {
                   height: 250,
                   decoration: const BoxDecoration(
                     image: DecorationImage(
-                      image: AssetImage(
-                          "lib/assets/images/login_background.png"), // top background
+                      image: AssetImage("lib/assets/images/login_background.png"),
                       fit: BoxFit.cover,
                     ),
                   ),
@@ -26,7 +38,7 @@ class LoginPage extends StatelessWidget {
                   child: Align(
                     alignment: Alignment.center,
                     child: Image.asset(
-                      "lib/assets/images/logo_novi.png", // center logo
+                      "lib/assets/images/logo_novi.png",
                       height: 100,
                       width: 100,
                     ),
@@ -34,7 +46,6 @@ class LoginPage extends StatelessWidget {
                 ),
               ],
             ),
-
             const SizedBox(height: 20),
 
             Padding(
@@ -47,91 +58,118 @@ class LoginPage extends StatelessWidget {
                     style: TextStyle(
                       fontFamily: 'Poppins',
                       fontSize: 24,
-                      fontWeight: FontWeight.w600, // SemiBold
+                      fontWeight: FontWeight.w600,
                     ),
                   ),
                   const SizedBox(height: 20),
 
-                  // Email
                   const Text(
                     "Email",
                     style: TextStyle(
                       fontFamily: 'Poppins',
                       fontSize: 16,
-                      fontWeight: FontWeight.w400, // SemiBold
+                      fontWeight: FontWeight.w400,
                     ),
                   ),
                   const SizedBox(height: 8),
                   TextField(
+                    controller: _usernameController,
                     decoration: InputDecoration(
                       enabledBorder: OutlineInputBorder(
-                          borderSide: BorderSide(
-                              color: Colors.black.withOpacity(0.24))),
-                      hintText: "Enter your email",
-                      hintStyle: TextStyle(
-                        color: Colors.black.withOpacity(0.44),
+                        borderSide: BorderSide(color: Colors.black.withOpacity(0.24)),
                       ),
-                      // prefixIcon: const Icon(Icons.email_outlined),
+                      hintText: "Enter your email",
+                      hintStyle: TextStyle(color: Colors.black.withOpacity(0.44)),
                     ),
                   ),
                   const SizedBox(height: 16),
 
-                  // Password
                   const Text(
                     "Password",
                     style: TextStyle(
                       fontFamily: 'Poppins',
                       fontSize: 16,
-                      fontWeight: FontWeight.w400, // SemiBold
+                      fontWeight: FontWeight.w400,
                     ),
                   ),
                   const SizedBox(height: 8),
                   TextField(
+                    controller: _passwordController,
                     obscureText: true,
                     decoration: InputDecoration(
                       enabledBorder: OutlineInputBorder(
-                          borderSide: BorderSide(
-                              color: Colors.black.withOpacity(0.24))),
-                      hintText: "Enter password",
-                      // prefixIcon: const Icon(Icons.lock_outline),
-                      hintStyle: TextStyle(
-                        color: Colors.black.withOpacity(0.44),
+                        borderSide: BorderSide(color: Colors.black.withOpacity(0.24)),
                       ),
+                      hintText: "Enter password",
+                      hintStyle: TextStyle(color: Colors.black.withOpacity(0.44)),
                     ),
                   ),
                   const SizedBox(height: 30),
 
-                  // Login button
                   SizedBox(
                     width: double.infinity,
                     child: ElevatedButton(
-                      onPressed: () {},
+                      onPressed: authProvider.loading
+                          ? null
+                          : () async {
+                              final username = _usernameController.text.trim();
+                              final password = _passwordController.text.trim();
+
+                              // Call login
+                              await authProvider.login(username, password);
+
+                              if (authProvider.token != null) {
+                                if (!mounted) return;
+                                Navigator.pushReplacement(
+                                  context,
+                                  MaterialPageRoute(builder: (_) => const HomePage()),
+                                );
+                              } else if (authProvider.error != null) {
+                                // Show nicer error message
+                                ScaffoldMessenger.of(context).clearSnackBars();
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    backgroundColor: Colors.red,
+                                    content: Text(
+                                      authProvider.error!,
+                                      style: const TextStyle(color: Colors.white),
+                                    ),
+                                  ),
+                                );
+                              }
+                            },
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: Color(0xFF006837),
+                        backgroundColor: const Color(0xFF006837),
                         padding: const EdgeInsets.symmetric(vertical: 14),
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(8),
                         ),
                       ),
-                      child: const Text(
-                        "Login",
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontFamily: 'Poppins',
-                          fontSize: 16,
-                          fontWeight: FontWeight.w600, // SemiBold
-                        ),
-                      ),
+                      child: authProvider.loading
+                          ? const SizedBox(
+                              height: 20,
+                              width: 20,
+                              child: CircularProgressIndicator(
+                                color: Colors.white,
+                                strokeWidth: 2,
+                              ),
+                            )
+                          : const Text(
+                              "Login",
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontFamily: 'Poppins',
+                                fontSize: 16,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
                     ),
                   ),
-
                   const SizedBox(height: 20),
 
-                  // Terms
                   const Text.rich(
                     TextSpan(
-                      text:
-                          "By creating or logging into an account you are agreeing with our ",
+                      text: "By creating or logging into an account you are agreeing with our ",
                       children: [
                         TextSpan(
                           text: "Terms and Conditions ",

@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import 'package:noviindus_patients/core/theme/app_theme.dart';
+import 'package:noviindus_patients/presentation/providers/auth_provider.dart';
 import 'package:noviindus_patients/screend/splash_screen.dart';
 
 void main() {
@@ -11,11 +13,20 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'Hospital App',
-      debugShowCheckedModeBanner: false,
-      theme:AppTheme.lightTheme,
-      home: const SplashScreen(),
+    return MultiProvider(
+      providers: [
+        ChangeNotifierProvider<AuthProvider>(
+          create: (_) => AuthProvider(),
+        ),
+        // 👉 Add more providers here as your project grows
+        // ChangeNotifierProvider(create: (_) => SomeOtherProvider()),
+      ],
+      child: MaterialApp(
+        title: 'Hospital App',
+        debugShowCheckedModeBanner: false,
+        theme: AppTheme.lightTheme,
+        home: const SplashScreen(),
+      ),
     );
   }
 }
