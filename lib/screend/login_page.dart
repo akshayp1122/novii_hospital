@@ -65,8 +65,8 @@ class LoginPage extends StatelessWidget {
                   TextField(
                     decoration: InputDecoration(
                       enabledBorder: OutlineInputBorder(
-                        borderSide: BorderSide( color: Colors.black.withOpacity(0.24))
-                      ),
+                          borderSide: BorderSide(
+                              color: Colors.black.withOpacity(0.24))),
                       hintText: "Enter your email",
                       hintStyle: TextStyle(
                         color: Colors.black.withOpacity(0.44),
@@ -89,9 +89,9 @@ class LoginPage extends StatelessWidget {
                   TextField(
                     obscureText: true,
                     decoration: InputDecoration(
-                       enabledBorder: OutlineInputBorder(
-                        borderSide: BorderSide( color: Colors.black.withOpacity(0.24))
-                      ),
+                      enabledBorder: OutlineInputBorder(
+                          borderSide: BorderSide(
+                              color: Colors.black.withOpacity(0.24))),
                       hintText: "Enter password",
                       // prefixIcon: const Icon(Icons.lock_outline),
                       hintStyle: TextStyle(
