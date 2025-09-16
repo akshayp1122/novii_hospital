@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:noviindus_patients/presentation/providers/branch_provider.dart';
 import 'package:noviindus_patients/presentation/providers/patient_provider.dart';
 import 'package:provider/provider.dart';
 import 'package:noviindus_patients/core/theme/app_theme.dart';
@@ -20,6 +21,7 @@ class MyApp extends StatelessWidget {
           create: (_) => AuthProvider(),
         ),
          ChangeNotifierProvider<PatientProvider>(create: (_) => PatientProvider()),
+           ChangeNotifierProvider<BranchProvider>(create: (_) => BranchProvider()), // 
         // 👉 Add more providers here as your project grows
         // ChangeNotifierProvider(create: (_) => SomeOtherProvider()),
       ],

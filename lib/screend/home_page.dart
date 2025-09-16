@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:noviindus_patients/presentation/providers/auth_provider.dart';
 import 'package:noviindus_patients/presentation/providers/patient_provider.dart';
+import 'package:noviindus_patients/screend/register_page.dart';
 import 'package:provider/provider.dart';
 import '../../domain/models/patient_model.dart';
 
@@ -196,7 +197,12 @@ class _BookingListPageState extends State<BookingListPage> {
         padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
         color: Colors.transparent,
         child: ElevatedButton(
-          onPressed: () {},
+          onPressed: () {
+            Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (context) => const RegisterPage()),
+      );
+          },
           style: ElevatedButton.styleFrom(
             backgroundColor: const Color(0xFF116530),
             shape:
