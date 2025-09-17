@@ -29,7 +29,7 @@ class _SplashScreenState extends State<SplashScreen> {
         children: [
           // Background image
           Image.asset(
-            "lib/assets/images/splash_novi.png", // put your background image here
+            "lib/assets/images/splash_novi.png", 
             fit: BoxFit.cover,
           ),
           // Overlay with logo

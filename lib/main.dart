@@ -26,7 +26,6 @@ class MyApp extends StatelessWidget {
          ChangeNotifierProvider<PatientProvider>(create: (_) => PatientProvider()),
            ChangeNotifierProvider<BranchProvider>(create: (_) => BranchProvider()), // 
            ChangeNotifierProvider(create: (_) => TreatmentProvider(TreatmentRepository())),
-        // 👉 Add more providers here as your project grows
         // ChangeNotifierProvider(create: (_) => SomeOtherProvider()),
       ],
       child: MaterialApp(

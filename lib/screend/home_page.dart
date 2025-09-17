@@ -97,7 +97,7 @@ class _BookingListPageState extends State<BookingListPage> {
                                   size: 25, color: Colors.grey),
                               hintText: 'Search for treatments',
                               hintStyle: TextStyle(
-                                color: Colors.black26, // 👈 text inside color
+                                color: Colors.black26, 
                                 fontSize: 16,
                               ),
                               border: InputBorder.none,
@@ -175,7 +175,7 @@ class _BookingListPageState extends State<BookingListPage> {
 
             const SizedBox(height: 14),
 
-            // 🔹 Booking list
+            //  Booking list
             Expanded(
               child: RefreshIndicator(
                 onRefresh: _refresh,
@@ -190,7 +190,7 @@ class _BookingListPageState extends State<BookingListPage> {
         ),
       ),
 
-      // 🔹 Bottom register button
+      //  Bottom register button
       bottomSheet: Container(
         height: 66,
         width: double.infinity,
