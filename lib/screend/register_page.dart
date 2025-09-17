@@ -2,7 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:noviindus_patients/presentation/providers/auth_provider.dart';
 import 'package:noviindus_patients/presentation/providers/branch_provider.dart';
 import 'package:noviindus_patients/presentation/providers/treatment_provider.dart';
-import 'package:noviindus_patients/screend/regi.dart';
+import 'package:noviindus_patients/services/patient_service.dart';
+import 'package:noviindus_patients/util/pdf_generator.dart';
 import 'package:provider/provider.dart';
 
 class RegisterPage extends StatefulWidget {
@@ -24,32 +25,154 @@ class _RegisterPageState extends State<RegisterPage> {
   final TextEditingController discountController = TextEditingController();
   final TextEditingController advanceController = TextEditingController();
   final TextEditingController balanceController = TextEditingController();
+  final TextEditingController _datecontroller = TextEditingController();
   DateTime? treatmentDate;
   String? paymentOption;
   int hour = 0;
   int minute = 0;
+
+  final PatientService _patientService = PatientService();
+
   @override
-void initState() {
-  super.initState();
-  WidgetsBinding.instance.addPostFrameCallback((_) {
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final authProvider = Provider.of<AuthProvider>(context, listen: false);
+      final branchProvider =
+          Provider.of<BranchProvider>(context, listen: false);
+      final treatmentProvider =
+          Provider.of<TreatmentProvider>(context, listen: false);
+
+      if (authProvider.token != null) {
+        branchProvider.fetchBranches(authProvider.token!);
+        treatmentProvider.fetchTreatments(authProvider.token!);
+      }
+    });
+  }
+
+  Future<void> _savePatient() async {
     final authProvider = Provider.of<AuthProvider>(context, listen: false);
-    final branchProvider = Provider.of<BranchProvider>(context, listen: false);
-     final treatmentProvider = Provider.of<TreatmentProvider>(context, listen: false);
+    final treatmentProvider =
+        Provider.of<TreatmentProvider>(context, listen: false);
 
-    if (authProvider.token != null) {
-      branchProvider.fetchBranches(authProvider.token!);
-      treatmentProvider.fetchTreatments(authProvider.token!);
+    if (authProvider.token == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("No auth token found")),
+      );
+      return;
     }
-  });
-}
 
+    if (treatments.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Please add at least one treatment")),
+      );
+      return;
+    }
+
+    // Parse numeric fields
+    double total = double.tryParse(totalController.text) ?? 0;
+    double discount = double.tryParse(discountController.text) ?? 0;
+    double advance = double.tryParse(advanceController.text) ?? 0;
+
+    // Calculate balance automatically
+    double balance = total - discount - advance;
+    if (balance < 0) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+            content: Text("Error: Total amount must be >= discount + advance")),
+      );
+      return;
+    }
+
+    // Collect treatment IDs
+    List<String> treatmentIds = [];
+    List<String> maleIds = [];
+    List<String> femaleIds = [];
+
+    for (var t in treatments) {
+      try {
+        final treatment = treatmentProvider.treatments
+            .firstWhere((tr) => tr.name == t["name"]);
+        final treatmentId = treatment.id.toString();
+        treatmentIds.add(treatmentId);
+        if ((t["male"] ?? 0) > 0) maleIds.add(treatmentId);
+        if ((t["female"] ?? 0) > 0) femaleIds.add(treatmentId);
+      } catch (e) {
+        // treatment not found, skip
+        continue;
+      }
+    }
+
+    if (treatmentIds.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("No valid treatments selected")),
+      );
+      return;
+    }
+
+    // Build request map
+    Map<String, dynamic> formMap = {
+      "name": nameController.text.trim(),
+      "excecutive": "Admin",
+      "payment": paymentOption ?? "Cash",
+      "phone": whatsappController.text.trim(),
+      "address": addressController.text.trim(),
+      "total_amount": total,
+      "discount_amount": discount,
+      "advance_amount": advance,
+      "balance_amount": balance,
+      "date_nd_time": treatmentDate != null
+          ? _patientService.formatDateTime(treatmentDate!, hour, minute)
+          : "",
+      "id": "",
+      "male": maleIds.join(","), // e.g., "2,3"
+      "female": femaleIds.join(","), // e.g., "2,3"
+      "branch": branch ?? "",
+      "treatments": treatmentIds.join(","), // e.g., "2,3,5"
+    };
+
+    debugPrint("📤 Sending data to backend:");
+    formMap.forEach((k, v) => debugPrint("   $k: $v"));
+
+    // Call API
+    final success =
+        await _patientService.registerPatient(formMap, authProvider.token!);
+    if (success) {
+      // ScaffoldMessenger.of(context).showSnackBar(
+      //   SnackBar(
+      //       content: Text(success
+      //           ? "✅ Patient registered successfully"
+      //           : "")),
+      // );
+    }
+
+    if (mounted) {
+      final pdfService = PdfService();
+      final pdfData = await pdfService.generateInvoice(
+        name: nameController.text,
+        address: addressController.text,
+        whatsapp: whatsappController.text,
+        bookedOn: DateTime.now().toString(),
+        treatmentDate: treatmentDate != null
+            ? "${treatmentDate!.day}/${treatmentDate!.month}/${treatmentDate!.year}"
+            : "",
+        treatmentTime: "$hour:$minute",
+        treatments: treatments,
+        total: total,
+        discount: discount,
+        advance: advance,
+        balance: balance,
+      );
+
+      pdfService.previewPdf(pdfData);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
         leading: const Icon(Icons.arrow_back),
-        // title: const Text("Register"),
         actions: const [
           Padding(
             padding: EdgeInsets.only(right: 12.0),
@@ -65,23 +188,18 @@ void initState() {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Padding(
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 22.0, vertical: 2),
-              child: Row(
-                children: const [
-                  Text(
-                    'Register',
-                    style: TextStyle(fontSize: 32, fontWeight: FontWeight.w600),
-                  ),
-                ],
+            const Padding(
+              padding: EdgeInsets.symmetric(horizontal: 22.0, vertical: 2),
+              child: Text(
+                'Register',
+                style: TextStyle(fontSize: 32, fontWeight: FontWeight.w600),
               ),
             ),
             const Padding(
               padding: EdgeInsets.symmetric(vertical: 15),
               child: Divider(height: 2, thickness: 3, color: Color(0xFFEDEDED)),
             ),
-            SizedBox(height: 10),
+            const SizedBox(height: 10),
             formLabel('Name'),
             _inputField(
                 "Enter your full name", "Enter your full name", nameController),
@@ -96,7 +214,6 @@ void initState() {
                 ["Kozhikode", "Kannur", "Thrissur"], location, (val) {
               setState(() => location = val);
             }),
-            formLabel('Branch'),
             formLabel('Branch'),
             Consumer<BranchProvider>(
               builder: (context, branchProvider, child) {
@@ -114,7 +231,7 @@ void initState() {
                   value: branch,
                   items: branchProvider.branches
                       .map((branchItem) => DropdownMenuItem<String>(
-                            value: branchItem.name,
+                            value: branchItem.id.toString(),
                             child: Text(branchItem.name),
                           ))
                       .toList(),
@@ -127,17 +244,23 @@ void initState() {
               },
             ),
             formLabel('Treatments'),
-            treatmentCard(),
+            // treatmentCard(),
             Column(
               children: treatments
                   .asMap()
                   .entries
                   .map((entry) => Card(
                         child: ListTile(
-                          title: Text(entry.value["name"],style: TextStyle(fontSize: 18 , fontWeight: FontWeight.w700),
-                       ),
+                          title: Text(
+                            entry.value["name"],
+                            style: const TextStyle(
+                                fontSize: 18, fontWeight: FontWeight.w700),
+                          ),
                           subtitle: Text(
-                              "Male ${entry.value["male"]},     Female ${entry.value["female"]}" ,style: TextStyle(fontSize: 16 ,color: Colors.green)),
+                            "Male ${entry.value["male"]},     Female ${entry.value["female"]}",
+                            style: const TextStyle(
+                                fontSize: 16, color: Colors.green),
+                          ),
                           trailing: Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
@@ -171,6 +294,7 @@ void initState() {
               ),
               child: const Text("+ Add Treatments"),
             ),
+            const SizedBox(height: 12),
             _inputField("Total Amount", "Enter amount", totalController),
             _inputField(
                 "Discount Amount", "Enter discount", discountController),
@@ -188,6 +312,7 @@ void initState() {
             const SizedBox(height: 12),
             const Text("Treatment Date"),
             TextField(
+              controller: _datecontroller,
               readOnly: true,
               decoration: const InputDecoration(
                 hintText: "Select Date",
@@ -202,6 +327,8 @@ void initState() {
                 );
                 if (picked != null) {
                   setState(() => treatmentDate = picked);
+                  _datecontroller.text =
+                      "${picked.day}/${picked.month}/${picked.year}";
                 }
               },
             ),
@@ -238,7 +365,7 @@ void initState() {
             SizedBox(
               width: double.infinity,
               child: ElevatedButton(
-                onPressed: () {},
+                onPressed: _savePatient,
                 style: ElevatedButton.styleFrom(backgroundColor: Colors.green),
                 child:
                     const Text("Save", style: TextStyle(color: Colors.white)),
@@ -268,101 +395,12 @@ void initState() {
       ),
       padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 12),
       child: Row(
-        children: [
-          // Left text column
+        children: const [
           Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Row with numbering and title
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: const [
-                    Text(
-                      '1.',
-                      style:
-                          TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
-                    ),
-                    SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        'Couple Combo package i..',
-                        style: TextStyle(
-                            fontSize: 18, fontWeight: FontWeight.w700),
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 14),
-                // male/female row
-                Row(
-                  children: [
-                    const Text('Male',
-                        style: TextStyle(color: kAccentGreen, fontSize: 16)),
-                    const SizedBox(width: 8),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 10, vertical: 6),
-                      decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border.all(color: kBorderGrey),
-                        color: Colors.white,
-                      ),
-                      child: const Text('2',
-                          style: TextStyle(
-                              color: kAccentGreen,
-                              fontWeight: FontWeight.w700)),
-                    ),
-                    const SizedBox(width: 22),
-                    const Text('Female',
-                        style: TextStyle(color: kAccentGreen, fontSize: 16)),
-                    const SizedBox(width: 8),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 10, vertical: 6),
-                      decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border.all(color: kBorderGrey),
-                        color: Colors.white,
-                      ),
-                      child: const Text('2',
-                          style: TextStyle(
-                              color: kAccentGreen,
-                              fontWeight: FontWeight.w700)),
-                    ),
-                  ],
-                )
-              ],
+            child: Text(
+              "No treatments added yet",
+              style: TextStyle(color: Colors.grey),
             ),
-          ),
-
-          // Right side icons column
-          Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              // round red delete button
-              Container(
-                width: 36,
-                height: 36,
-                decoration: const BoxDecoration(
-                  color: Color(0xFFF9D6D6),
-                  shape: BoxShape.circle,
-                ),
-                child: const Icon(Icons.clear, color: Color(0xFFB40000)),
-              ),
-              const SizedBox(height: 14),
-              // pencil icon
-              Container(
-                width: 34,
-                height: 34,
-                decoration: BoxDecoration(
-                  color: Colors.transparent,
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: const Icon(Icons.edit, color: kAccentGreen),
-              ),
-            ],
           ),
         ],
       ),
@@ -407,129 +445,135 @@ void initState() {
       ],
     );
   }
-void _addTreatment({int? editIndex}) {
-   final treatmentProvider =
-      Provider.of<TreatmentProvider>(context, listen: false);
-  String? selectedTreatment;
-  int male = 0, female = 0;
 
-  if (editIndex != null) {
-    selectedTreatment = treatments[editIndex]["name"];
-    male = treatments[editIndex]["male"];
-    female = treatments[editIndex]["female"];
-  }
+  void _addTreatment({int? editIndex}) {
+    final treatmentProvider =
+        Provider.of<TreatmentProvider>(context, listen: false);
+    String? selectedTreatment;
+    int male = 0, female = 0;
 
-  showDialog(
-    context: context,
-    builder: (context) {
-      return AlertDialog(backgroundColor: Colors.white,
-        content: StatefulBuilder(
-          builder: (context, setStateDialog) {
-            return SingleChildScrollView( // 👈 prevents vertical overflow
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text("Choose treatment",style: TextStyle(fontSize: 16),),
-                  SizedBox(height: 8,),
-                  treatmentProvider.loading
-                      ? const Center(child: CircularProgressIndicator())
-                      : DropdownButtonFormField<String>(
-                          isExpanded: true, // 👈 fixes horizontal overflow
-                          value: selectedTreatment,
-                          decoration: const InputDecoration(
-                            labelText: "Choose prefered Treatment",
-                            labelStyle: TextStyle(overflow: TextOverflow.ellipsis),
+    if (editIndex != null) {
+      selectedTreatment = treatments[editIndex]["name"];
+      male = treatments[editIndex]["male"];
+      female = treatments[editIndex]["female"];
+    }
+
+    showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          backgroundColor: Colors.white,
+          content: StatefulBuilder(
+            builder: (context, setStateDialog) {
+              return SingleChildScrollView(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Text("Choose treatment"),
+                    const SizedBox(height: 8),
+                    treatmentProvider.loading
+                        ? const Center(child: CircularProgressIndicator())
+                        : DropdownButtonFormField<String>(
+                            isExpanded: true,
+                            value: selectedTreatment,
+                            decoration: const InputDecoration(
+                              labelText: "Choose preferred Treatment",
+                              labelStyle:
+                                  TextStyle(overflow: TextOverflow.ellipsis),
+                            ),
+                            items: treatmentProvider.treatments.map((t) {
+                              return DropdownMenuItem(
+                                value: t.name,
+                                child: Text(
+                                  "${t.name} (${t.duration}) - ₹${t.price}",
+                                  overflow: TextOverflow.ellipsis,
+                                  maxLines: 1,
+                                ),
+                              );
+                            }).toList(),
+                            onChanged: (val) =>
+                                setStateDialog(() => selectedTreatment = val),
                           ),
-                          items: treatmentProvider.treatments.map((t) {
-                            return DropdownMenuItem(
-                              value: t.name,
-                              child: Text(
-                                "${t.name} (${t.duration}) - ₹${t.price}",
-                                overflow: TextOverflow.ellipsis,
-                                maxLines: 1,
-                              ),
-                            );
-                          }).toList(),
-                          onChanged: (val) =>
-                              setStateDialog(() => selectedTreatment = val),
+                    const SizedBox(height: 16),
+
+                    // Male Counter
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text("Male"),
+                        IconButton(
+                          icon: const Icon(Icons.remove_circle,
+                              color: Colors.green),
+                          onPressed: () {
+                            if (male > 0) setStateDialog(() => male--);
+                          },
                         ),
-                  const SizedBox(height: 16),
-
-                  // Male Counter
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      const Text("Male"),
-                      IconButton(
-                        icon: const Icon(Icons.remove_circle, color: Colors.green),
-                        onPressed: () {
-                          if (male > 0) setStateDialog(() => male--);
-                        },
-                      ),
-                      Text(male.toString()),
-                      IconButton(
-                        icon: const Icon(Icons.add_circle, color: Colors.green),
-                        onPressed: () => setStateDialog(() => male++),
-                      ),
-                    ],
-                  ),
-
-                  // Female Counter
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      const Text("Female"),
-                      IconButton(
-                        icon: const Icon(Icons.remove_circle, color: Colors.green),
-                        onPressed: () {
-                          if (female > 0) setStateDialog(() => female--);
-                        },
-                      ),
-                      Text(female.toString()),
-                      IconButton(
-                        icon: const Icon(Icons.add_circle, color: Colors.green),
-                        onPressed: () => setStateDialog(() => female++),
-                      ),
-                    ],
-                  ),
-
-                  const SizedBox(height: 20),
-
-                  // Save Button
-                  ElevatedButton(
-                    onPressed: () {
-                      if (selectedTreatment != null) {
-                        final newTreatment = {
-                          "name": selectedTreatment!,
-                          "male": male,
-                          "female": female,
-                        };
-                        setState(() {
-                          if (editIndex != null) {
-                            treatments[editIndex] = newTreatment;
-                          } else {
-                            treatments.add(newTreatment);
-                          }
-                        });
-                        Navigator.pop(context);
-                      }
-                    },
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.green,
+                        Text(male.toString()),
+                        IconButton(
+                          icon:
+                              const Icon(Icons.add_circle, color: Colors.green),
+                          onPressed: () => setStateDialog(() => male++),
+                        ),
+                      ],
                     ),
-                    child: const Text(
-                      "Save",
-                      style: TextStyle(color: Colors.white),
-                    ),
-                  ),
-                ],
-              ),
-            );
-          },
-        ),
-      );
-    },
-  );
-}}
 
+                    // Female Counter
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text("Female"),
+                        IconButton(
+                          icon: const Icon(Icons.remove_circle,
+                              color: Colors.green),
+                          onPressed: () {
+                            if (female > 0) setStateDialog(() => female--);
+                          },
+                        ),
+                        Text(female.toString()),
+                        IconButton(
+                          icon:
+                              const Icon(Icons.add_circle, color: Colors.green),
+                          onPressed: () => setStateDialog(() => female++),
+                        ),
+                      ],
+                    ),
+
+                    const SizedBox(height: 20),
+
+                    ElevatedButton(
+                      onPressed: () {
+                        if (selectedTreatment != null) {
+                          final newTreatment = {
+                            "name": selectedTreatment!,
+                            "male": male,
+                            "female": female,
+                          };
+                          setState(() {
+                            if (editIndex != null) {
+                              treatments[editIndex] = newTreatment;
+                            } else {
+                              treatments.add(newTreatment);
+                            }
+                          });
+                          Navigator.pop(context);
+                        }
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.green,
+                      ),
+                      child: const Text(
+                        "Save",
+                        style: TextStyle(color: Colors.white),
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            },
+          ),
+        );
+      },
+    );
+  }
+}
